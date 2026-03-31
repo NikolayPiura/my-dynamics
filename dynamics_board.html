@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Динамики</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 1.2rem;
+    }
+
+    .board { max-width: 1500px; margin: 0 auto; }
+
+    .top-bar {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;
+    }
+
+    h1 { font-size: 18px; font-weight: 600; color: #fff; letter-spacing: 0.3px; }
+
+    .open-modal-btn {
+      font-size: 13px; padding: 7px 18px;
+      border: 1px solid #444; border-radius: 8px;
+      cursor: pointer; background: #1e1e1e; color: #e0e0e0;
+      font-weight: 500; transition: background 0.15s;
+    }
+    .open-modal-btn:hover { background: #2a2a2a; border-color: #666; }
+
+    .legend { display: flex; gap: 18px; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #888; }
+    .legend-dot { width: 13px; height: 13px; border-radius: 3px; }
+    .hint { font-size: 11px; color: #555; margin-left: 4px; }
+
+    .columns {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      gap: 6px;
+    }
+    @media (max-width: 1000px) { .columns { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+    @media (max-width: 560px)  { .columns { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+    .col { display: flex; flex-direction: column; }
+
+    .col-header {
+      font-size: 11px; font-weight: 600; text-align: center;
+      padding: 6px 4px; background: #1c1c1c;
+      border-radius: 7px; border: 1px solid #2e2e2e;
+      color: #aaa; margin-bottom: 4px; letter-spacing: 0.2px;
+    }
+
+    .col-items { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+
+    .item {
+      font-size: 10.5px; padding: 5px 4px; border-radius: 5px;
+      text-align: center; cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.07);
+      transition: transform 0.08s, filter 0.08s;
+      user-select: none; line-height: 1.35;
+      word-break: break-word; font-weight: 500;
+    }
+    .item:hover { transform: scale(1.04); filter: brightness(1.12); }
+    .item:active { transform: scale(0.97); }
+    .item.red    { background: #c0392b; color: #ffe0de; border-color: #922b21; }
+    .item.yellow { background: #b8860b; color: #fff3c0; border-color: #8a6400; }
+    .item.green  { background: #1e8449; color: #c8f5d8; border-color: #155d35; }
+
+    .col-add { margin-top: 5px; }
+    .col-add button {
+      width: 100%; font-size: 10px; padding: 5px;
+      border: 1px dashed #333; border-radius: 5px;
+      background: transparent; color: #555; cursor: pointer;
+      transition: color 0.1s, border-color 0.1s;
+    }
+    .col-add button:hover { color: #aaa; border-color: #555; }
+
+    /* MODAL */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.72);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: #181818;
+      border: 1px solid #2e2e2e;
+      border-radius: 16px;
+      padding: 1.6rem;
+      width: 340px;
+      max-width: 94vw;
+      box-shadow: 0 24px 70px rgba(0,0,0,0.8);
+      animation: popIn 0.17s ease;
+    }
+    @keyframes popIn {
+      from { transform: scale(0.91); opacity: 0; }
+      to   { transform: scale(1);    opacity: 1; }
+    }
+
+    .modal h2 { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 1.2rem; }
+
+    .modal label {
+      display: block; font-size: 10px; color: #666;
+      margin-bottom: 5px; margin-top: 14px;
+      text-transform: uppercase; letter-spacing: 0.6px;
+    }
+    .modal label:first-of-type { margin-top: 0; }
+
+    .modal input, .modal select {
+      width: 100%; font-size: 13px; padding: 8px 10px;
+      border: 1px solid #2e2e2e; border-radius: 8px;
+      background: #111; color: #e0e0e0;
+      outline: none; transition: border-color 0.15s;
+    }
+    .modal input:focus, .modal select:focus { border-color: #555; }
+    .modal select option { background: #1a1a1a; }
+
+    .color-btns { display: flex; gap: 8px; }
+    .color-btn {
+      flex: 1; padding: 8px 4px; border-radius: 7px;
+      border: 2px solid transparent; cursor: pointer;
+      font-size: 11px; font-weight: 600;
+      transition: border-color 0.12s, transform 0.08s;
+    }
+    .color-btn:active { transform: scale(0.96); }
+    .color-btn.red    { background: #c0392b; color: #ffe0de; }
+    .color-btn.yellow { background: #b8860b; color: #fff3c0; }
+    .color-btn.green  { background: #1e8449; color: #c8f5d8; }
+    .color-btn.selected { border-color: #fff; }
+
+    .modal-actions { display: flex; gap: 8px; margin-top: 1.4rem; }
+    .btn-cancel {
+      flex: 1; padding: 9px; border-radius: 8px;
+      border: 1px solid #2e2e2e; background: transparent;
+      color: #777; font-size: 13px; cursor: pointer;
+      transition: background 0.12s;
+    }
+    .btn-cancel:hover { background: #222; }
+    .btn-confirm {
+      flex: 2; padding: 9px; border-radius: 8px;
+      border: none; background: #1e6e40;
+      color: #c8f5d8; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: background 0.12s;
+    }
+    .btn-confirm:hover { background: #278a52; }
+  </style>
+</head>
+<body>
+<div class="board">
+  <div class="top-bar">
+    <h1>Динамики</h1>
+    <button class="open-modal-btn" onclick="openModal()">+ Добавить пункт</button>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#c0392b"></div>1–3 красный</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#b8860b"></div>4–6 жёлтый</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#1e8449"></div>8–9 зелёный</div>
+    <span class="hint">· нажмите на пункт для смены цвета</span>
+  </div>
+
+  <div class="columns" id="board"></div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="overlayClick(event)">
+  <div class="modal">
+    <h2>Новый пункт</h2>
+
+    <label>Название</label>
+    <input type="text" id="m-text" placeholder="Введите текст..." />
+
+    <label>Динамика</label>
+    <select id="m-col">
+      <option value="0">1 Динамика</option>
+      <option value="1">2 Динамика</option>
+      <option value="2">3 Динамика</option>
+      <option value="3">4 Динамика</option>
+      <option value="4">5 Динамика</option>
+      <option value="5">6 Динамика</option>
+      <option value="6">7 Динамика</option>
+      <option value="7">8 Динамика</option>
+    </select>
+
+    <label>Цвет</label>
+    <div class="color-btns">
+      <button class="color-btn red selected"  onclick="selectColor('red')"    id="cb-red">Красный</button>
+      <button class="color-btn yellow"         onclick="selectColor('yellow')" id="cb-yellow">Жёлтый</button>
+      <button class="color-btn green"          onclick="selectColor('green')"  id="cb-green">Зелёный</button>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel"  onclick="closeModal()">Отмена</button>
+      <button class="btn-confirm" onclick="confirmAdd()">Добавить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const COLS  = ['1 Динамика','2 Динамика','3 Динамика','4 Динамика','5 Динамика','6 Динамика','7 Динамика','8 Динамика'];
+  const CYCLE = ['red','yellow','green'];
+  let selectedColor  = 'red';
+  let modalTargetCol = null;
+
+  const data = [
+    [{t:'Сон',c:'green'},{t:'Фигура',c:'green'},{t:'Отдых',c:'green'},{t:'Гигиена',c:'green'},{t:'Внешний вид',c:'green'},{t:'Режим дня',c:'green'},{t:'Питание',c:'green'},{t:'Эффективность',c:'green'},{t:'Здоровье',c:'yellow'},{t:'Навыки',c:'yellow'},{t:'Техническое образование',c:'yellow'},{t:'Функциональность тела',c:'yellow'},{t:'Общее образование',c:'yellow'}],
+    [{t:'Взаимоотношения с Сашей',c:'red'},{t:'Совместные увлечения',c:'red'},{t:'Путешествия',c:'red'},{t:'Дети',c:'red'},{t:'Секс',c:'red'}],
+    [{t:'Инвестиционный фонд PFF',c:'yellow'},{t:'Управление другими фондами',c:'yellow'},{t:'Климэйт',c:'red'},{t:'Благотворительный фонд',c:'red'},{t:'Наставничество',c:'yellow'},{t:'Настольный теннис',c:'yellow'},{t:'Семья',c:'yellow'},{t:'Бизнес',c:'red'},{t:'Франшиза',c:'red'},{t:'PurrCat',c:'red'},{t:'Родительский дом',c:'red'},{t:'Снитч',c:'red'},{t:'Саентология',c:'red'},{t:'Друзья',c:'red'},{t:'Шахматы',c:'yellow'},{t:'Спортивный зал + ММА',c:'yellow'}],
+    [{t:'Алкогольная зависимость',c:'yellow'},{t:'Наркологическая зависимость',c:'yellow'},{t:'Табачная зависимость',c:'yellow'},{t:'Брак, Разводы',c:'red'},{t:'Война',c:'red'},{t:'Люди преклонного возраста',c:'red'},{t:'Образование детей',c:'red'}],
+    [{t:'Котики',c:'green'},{t:'Деревья',c:'green'},{t:'Животные',c:'green'},{t:'Птицы',c:'red'}],
+    [{t:'Капитал',c:'yellow'},{t:'Жилье',c:'yellow'},{t:'Мелкие объекты',c:'yellow'},{t:'Чужое имущество',c:'red'},{t:'Чистота планеты',c:'yellow'},{t:'Искуственный интеллект',c:'yellow'},{t:'Чистота воды',c:'red'}],
+    [{t:'Духовная свобода',c:'yellow'},{t:'Этика',c:'yellow'},{t:'Личные необходимости',c:'red'},{t:'Положение на шкале тонов',c:'red'},{t:'Контроль над телом',c:'yellow'},{t:'Драматизация',c:'yellow'},{t:'Клонирование других Тетанов',c:'red'}],
+    [{t:'Концепт',c:'yellow'},{t:'Абсолют',c:'red'}]
+  ];
+
+  function cycleColor(ci, ii) {
+    const item = data[ci][ii];
+    item.c = CYCLE[(CYCLE.indexOf(item.c) + 1) % CYCLE.length];
+    render();
+  }
+
+  function openModal(colIdx) {
+    modalTargetCol = (colIdx !== undefined) ? colIdx : null;
+    if (modalTargetCol !== null) document.getElementById('m-col').value = modalTargetCol;
+    document.getElementById('m-text').value = '';
+    selectColor('red');
+    document.getElementById('modal-overlay').classList.add('open');
+    setTimeout(() => document.getElementById('m-text').focus(), 80);
+  }
+
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+    modalTargetCol = null;
+  }
+
+  function overlayClick(e) {
+    if (e.target === document.getElementById('modal-overlay')) closeModal();
+  }
+
+  function selectColor(c) {
+    selectedColor = c;
+    ['red','yellow','green'].forEach(x =>
+      document.getElementById('cb-' + x).classList.toggle('selected', x === c)
+    );
+  }
+
+  function confirmAdd() {
+    const text = document.getElementById('m-text').value.trim();
+    if (!text) { document.getElementById('m-text').focus(); return; }
+    const col = parseInt(document.getElementById('m-col').value);
+    data[col].push({ t: text, c: selectedColor });
+    closeModal();
+    render();
+  }
+
+  function render() {
+    const board = document.getElementById('board');
+    board.innerHTML = '';
+    COLS.forEach((colName, ci) => {
+      const col = document.createElement('div');
+      col.className = 'col';
+
+      const header = document.createElement('div');
+      header.className = 'col-header';
+      header.textContent = colName;
+      col.appendChild(header);
+
+      const items = document.createElement('div');
+      items.className = 'col-items';
+      data[ci].forEach((item, ii) => {
+        const el = document.createElement('div');
+        el.className = 'item ' + item.c;
+        el.textContent = item.t;
+        el.title = 'Нажмите для смены цвета';
+        el.onclick = () => cycleColor(ci, ii);
+        items.appendChild(el);
+      });
+      col.appendChild(items);
+
+      const addDiv = document.createElement('div');
+      addDiv.className = 'col-add';
+      const addBtn = document.createElement('button');
+      addBtn.textContent = '+ добавить';
+      addBtn.onclick = () => openModal(ci);
+      addDiv.appendChild(addBtn);
+      col.appendChild(addDiv);
+
+      board.appendChild(col);
+    });
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+    if (e.key === 'Enter' && document.getElementById('modal-overlay').classList.contains('open')) confirmAdd();
+  });
+
+  render();
+</script>
+</body>
+</html>
